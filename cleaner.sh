@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly VERSION="1.0.0"
+readonly SCRIPT_NAME="$(basename "$0")"
+
+## Print usage information
+usage() {
+    cat << EOF
+Usage: ${SCRIPT_NAME} [package_name]
+
+Clean up configuration files for uninstalled packages.
+
+Arguments:
+  package_name    Name of the package to search for in XDG directories
+
+Options:
+  --help, -h      Show this help message and exit
+
+Safety Features:
+  - Requires at least 3 characters for package name
+  - Cannot run as root
+  - Shows all paths before deletion
+  - Defaults to safe (No) on confirmation prompt
+
+XDG Directories scanned:
+  - \$HOME/.config/
+  - \$HOME/.local/share/
+  - \$HOME/.cache/
+
+Examples:
+  ${SCRIPT_NAME} firefox      # Search for firefox configs
+  ${SCRIPT_NAME} node         # Search for node related files
+EOF
+}
+
+## Check if running as root and exit if true
+check_root() {
+    if [[ $EUID -eq 0 ]]; then
+        echo "Error: Do not run as root" >&2
+        exit 1
+    fi
+}
+
+## Validate package name length
+validate_package_name() {
+    local package="$1"
+    local length=${#package}
+
+    if [[ $length -lt 3 ]]; then
+        echo "Error: Package name must be at least 3 characters long (got: '${package}')" >&2
+        echo "This prevents accidental broad deletions." >&2
+        exit 1
+    fi
+}
+
+## Check if XDG directories exist
+xdg_dirs_exist() {
+    local dir_exists=false
+
+    [[ -d "$HOME/.config" ]] && dir_exists=true
+    [[ -d "$HOME/.local/share" ]] && dir_exists=true
+    [[ -d "$HOME/.cache" ]] && dir_exists=true
+
+    if [[ "$dir_exists" == "false" ]]; then
+        echo "Error: No XDG directories found" >&2
+        exit 1
+    fi
+}
+
+## Find config directories matching package name
+## Args: $1 - package name
+## Output: List of matching paths (one per line)
+find_configs() {
+    local package="$1"
+    local matches=()
+
+    # Search in XDG directories (case-insensitive)
+    if [[ -d "$HOME/.config" ]]; then
+        while IFS= read -r -d '' path; do
+            matches+=("$path")
+        done < <(find "$HOME/.config" -maxdepth 1 -type d -iname "*${package}*" -print0 2>/dev/null || true)
+    fi
+
+    if [[ -d "$HOME/.local/share" ]]; then
+        while IFS= read -r -d '' path; do
+            matches+=("$path")
+        done < <(find "$HOME/.local/share" -maxdepth 1 -type d -iname "*${package}*" -print0 2>/dev/null || true)
+    fi
+
+    if [[ -d "$HOME/.cache" ]]; then
+        while IFS= read -r -d '' path; do
+            matches+=("$path")
+        done < <(find "$HOME/.cache" -maxdepth 1 -type d -iname "*${package}*" -print0 2>/dev/null || true)
+    fi
+
+    # Output matches
+    if [[ ${#matches[@]} -gt 0 ]]; then
+        printf '%s\n' "${matches[@]}"
+    fi
+}
+
+## Display found paths to user
+## Args: $1 - package name
+##       ${@:2} - array of paths
+show_paths() {
+    local package="$1"
+    shift
+    local paths=("$@")
+
+    echo "Found ${#paths[@]} path(s) matching '${package}':"
+    echo ""
+    for path in "${paths[@]}"; do
+        echo "  $path"
+    done
+    echo ""
+}
+
+## Prompt user for confirmation
+## Returns: 0 if confirmed, 1 otherwise
+confirm_deletion() {
+    local count="$1"
+    local response
+
+    read -r -p "Found $count path(s). Delete? [y/N] " response
+
+    # Default to N (safe option)
+    case "$response" in
+        [Yy]|[Yy][Ee][Ss])
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+## Delete the specified paths
+## Args: $@ - array of paths to delete
+delete_paths() {
+    local paths=("$@")
+    local deleted=0
+
+    echo "Deleting..."
+    for path in "${paths[@]}"; do
+        if rm -rf "$path"; then
+            echo " Deleted: $path"
+            ((deleted++))
+        else
+            echo " Failed: $path" >&2
+        fi
+    done
+
+    echo ""
+    echo "Cleanup complete. Deleted $deleted path(s)."
+}
+
+main() {
+    # Check for root
+    check_root
+
+    # Handle arguments
+    if [[ $# -eq 0 ]]; then
+        usage
+        exit 1
+    fi
+
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --version|-v)
+            echo "${SCRIPT_NAME} version ${VERSION}"
+            exit 0
+            ;;
+    esac
+
+    local package="$1"
+
+    # Validate inputs
+    validate_package_name "$package"
+    xdg_dirs_exist
+
+    # Find matching configs
+    local paths=()
+    while IFS= read -r path; do
+        [[ -n "$path" ]] && paths+=("$path")
+    done < <(find_configs "$package")
+
+    # No matches found
+    if [[ ${#paths[@]} -eq 0 ]]; then
+        echo "No configuration files found for '${package}'"
+        exit 0
+    fi
+
+    # Show dry run results
+    show_paths "$package" "${paths[@]}"
+
+    # Prompt for confirmation
+    if confirm_deletion "${#paths[@]}"; then
+        delete_paths "${paths[@]}"
+    else
+        echo "Cancelled. No files were deleted."
+        exit 0
+    fi
+}
+
+main "$@"
