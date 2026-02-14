@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly VERSION="1.0.0"
+readonly VERSION="0.0.1"
 readonly SCRIPT_NAME="$(basename "$0")"
 
 ## Print usage information
