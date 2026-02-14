@@ -27,7 +27,7 @@ Download the [repository](https://github.com/SMK-Negeri-12-Malang/xdg-cleaner/) 
 
 ```bash
 unzip xdg-cleaner
-cd xdg-cleaner
+cd xdg-cleaner-master
 ```
 
 ### Step 2: Install
@@ -35,6 +35,7 @@ cd xdg-cleaner
 Run the install script to install `cleaner` to `~/.local/bin`:
 
 ```bash
+chmod +x install.sh
 ./install.sh
 ```
 
