@@ -10,6 +10,9 @@ If you want to clean uninstall the software, this tool is what used for
 it will automaticly delete configuration files in XDG directories
 (`~/.config`, `~/.local/share`, `~/.cache`).
 
+**⚠️ WARNING:** I vibe coding this tool so i have no idea what's going on in here, maybe a little :). 
+> Make sure you have a backup before proceeding.
+
 
 ## Installation Guide
 
@@ -20,7 +23,7 @@ it will automaticly delete configuration files in XDG directories
 
 ### Step 1: Download
 
-Download the (repository)[https://github.com/SMK-Negeri-12-Malang/xdg-cleaner/] to your machine and extract the repository:
+Download the [repository](https://github.com/SMK-Negeri-12-Malang/xdg-cleaner/) to your machine and extract the repository:
 
 ```bash
 unzip xdg-cleaner
