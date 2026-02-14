@@ -11,7 +11,6 @@ it will automaticly delete configuration files in XDG directories
 (`~/.config`, `~/.local/share`, `~/.cache`).
 
 **⚠️ WARNING:** I vibe coding this tool so i have no idea what's going on in here, maybe a little :). 
-> Make sure you have a backup before proceeding.
 
 
 ## Installation Guide
