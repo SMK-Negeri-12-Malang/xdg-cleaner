@@ -3,7 +3,6 @@
 ## Project Overview
 - **Type**: Bash CLI tool
 - **Purpose**: Clean up residual XDG config files for uninstalled packages
-- **Spec**: See `agents/spec.md` for detailed requirements
 
 ## Code Style Guidelines
 
