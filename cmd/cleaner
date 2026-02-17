@@ -4,6 +4,9 @@ set -euo pipefail
 readonly VERSION="0.0.1"
 readonly SCRIPT_NAME="$(basename "$0")"
 
+# Flag to enable exact matching
+USE_EXACT=false
+
 ## Print usage information
 usage() {
     cat << EOF
@@ -16,6 +19,7 @@ Arguments:
 
 Options:
   --help, -h      Show this help message and exit
+  --ex            Match package name exactly (case-insensitive)
 
 Safety Features:
   - Requires at least 2 characters for package name
@@ -31,6 +35,7 @@ XDG Directories scanned:
 Examples:
   ${SCRIPT_NAME} firefox      # Search for firefox configs
   ${SCRIPT_NAME} node         # Search for node related files
+  ${SCRIPT_NAME} --ex code    # Match exactly 'code', not 'vscode' or 'code-server'
 EOF
 }
 
@@ -70,28 +75,38 @@ xdg_dirs_exist() {
 
 ## Find config directories matching package name
 ## Args: $1 - package name
+##       $2 - use exact match (true/false)
 ## Output: List of matching paths (one per line)
 find_configs() {
     local package="$1"
+    local use_exact="$2"
     local matches=()
+    local find_pattern
+
+    # Set find pattern based on exact match flag
+    if [[ "$use_exact" == "true" ]]; then
+        find_pattern="${package}"
+    else
+        find_pattern="*${package}*"
+    fi
 
     # Search in XDG directories (case-insensitive)
     if [[ -d "$HOME/.config" ]]; then
         while IFS= read -r -d '' path; do
             matches+=("$path")
-        done < <(find "$HOME/.config" -maxdepth 1 -type d -iname "*${package}*" -print0 2>/dev/null || true)
+        done < <(find "$HOME/.config" -maxdepth 1 -type d -iname "${find_pattern}" -print0 2>/dev/null || true)
     fi
 
     if [[ -d "$HOME/.local/share" ]]; then
         while IFS= read -r -d '' path; do
             matches+=("$path")
-        done < <(find "$HOME/.local/share" -maxdepth 1 -type d -iname "*${package}*" -print0 2>/dev/null || true)
+        done < <(find "$HOME/.local/share" -maxdepth 1 -type d -iname "${find_pattern}" -print0 2>/dev/null || true)
     fi
 
     if [[ -d "$HOME/.cache" ]]; then
         while IFS= read -r -d '' path; do
             matches+=("$path")
-        done < <(find "$HOME/.cache" -maxdepth 1 -type d -iname "*${package}*" -print0 2>/dev/null || true)
+        done < <(find "$HOME/.cache" -maxdepth 1 -type d -iname "${find_pattern}" -print0 2>/dev/null || true)
     fi
 
     # Output matches
@@ -165,16 +180,37 @@ main() {
         exit 1
     fi
 
-    case "$1" in
-        --help|-h)
-            usage
-            exit 0
-            ;;
-        --version|-v)
-            echo "${SCRIPT_NAME} version ${VERSION}"
-            exit 0
-            ;;
-    esac
+    # Parse flags before package name
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help|-h)
+                usage
+                exit 0
+                ;;
+            --version|-v)
+                echo "${SCRIPT_NAME} version ${VERSION}"
+                exit 0
+                ;;
+            --ex)
+                USE_EXACT=true
+                shift
+                ;;
+            -*)
+                echo "Error: Unknown option '$1'" >&2
+                usage
+                exit 1
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    # Check if package name provided after flags
+    if [[ $# -eq 0 ]]; then
+        usage
+        exit 1
+    fi
 
     local package="$1"
 
@@ -186,7 +222,7 @@ main() {
     local paths=()
     while IFS= read -r path; do
         [[ -n "$path" ]] && paths+=("$path")
-    done < <(find_configs "$package")
+    done < <(find_configs "$package" "$USE_EXACT")
 
     # No matches found
     if [[ ${#paths[@]} -eq 0 ]]; then
